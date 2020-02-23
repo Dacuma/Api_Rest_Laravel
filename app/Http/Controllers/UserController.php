@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\JwtAuth;
 use Illuminate\Http\Request;
 use App\User;
 
@@ -37,7 +38,7 @@ class UserController extends Controller
                 );
             }else{
                 // Cifrar la contraseña
-                $pwd = password_hash($params->password, PASSWORD_BCRYPT, ['cost' => 4]);
+                $pwd = hash('sha256', $params->password);
                 // Comprobar si el usuario existe ya (duplicado). Esto se hace con el validador de email unique.
                 // Crear el usuario
                 $user = new User();
@@ -67,6 +68,50 @@ class UserController extends Controller
     }
 
     public function login(request $request){
-        return "Acción de login de usuarios";
+        $jwtAuth = new JwtAuth();
+
+        // Recibir datos por post
+        $json = $request->input('json', null);
+        $params = json_decode($json);
+        $params_array = json_decode($json, true);
+
+        // Validar esos datos
+        $validate = \Validator::make($params_array, [
+            'email' => 'required|email',
+            'password' => 'required'
+        ]);
+
+        if($validate->fails()){
+            $signup = array(
+                'status' => 'error',
+                'code' => 404,
+                'message' => 'El usuario no se ha podido loguear',
+                'errors' => $validate->errors()
+            );
+        }else{
+            // Cifrar la contraseña
+            $pwd = hash('sha256', $params->password);
+            // Devolver token o datos
+           $signup = $jwtAuth->signup($params->email, $pwd);
+           if(!empty($params->gettoken)){
+                $signup = $jwtAuth->signup($params->email, $pwd, true);
+            }
+        }
+
+        return response()->json($signup, 200);
+    }
+
+    public function update(Request $request){
+        $token = $request->header('Authorization');
+        $jwtAuth = new JwtAuth();
+        $checkToken = $jwtAuth->checkToken($token);
+
+        if($checkToken){
+            echo '<h1>Login correcto</h1>';
+        }else{
+            echo '<h1>Login incorrecto</h1>';
+        }
+
+        die();
     }
 }
